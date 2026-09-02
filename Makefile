@@ -8,12 +8,14 @@ ASFLAGS = -f elf32
 CFLAGS = -m32 -ffreestanding -O2 -Wall -Wextra -fno-pie -Ikernel
 LDFLAGS = -m elf_i386 -T linker.ld -nostdlib
 
-# File sorgente e oggetti
-ASM_SRC = boot/boot.s
-C_SRC = $(shell find kernel -type f -name '*.c')
+# Ricerca automatica dei file sorgente C e Assembly (.s o .asm)
+C_SRC   = $(shell find kernel -type f -name '*.c')
+ASM_SRC = $(shell find boot kernel -type f \( -name '*.s' -o -name '*.asm' \))
 
-ASM_OBJ = boot/boot.o
-C_OBJ = $(C_SRC:.c=.o)
+# Conversione dei file sorgente nei corrispettivi oggetti (.o)
+C_OBJ   = $(C_SRC:.c=.o)
+ASM_OBJ = $(patsubst %.s,%.o,$(patsubst %.asm,%.o,$(ASM_SRC)))
+
 OBJS = $(ASM_OBJ) $(C_OBJ)
 
 # Output
@@ -25,23 +27,27 @@ ISO_OUT = forth_os.iso
 # Target predefinito: crea l'immagine ISO
 all: $(ISO_OUT)
 
-# Regola per l'assembler
-boot/boot.o: $(ASM_SRC)
+# Regola generica per compilare qualsiasi file Assembly (.s)
+%.o: %.s
 	$(AS) $(ASFLAGS) $< -o $@
 
-# Regola per i file C nel kernel
-kernel/%.o: kernel/%.c
+# Regola generica per compilare qualsiasi file Assembly (.asm)
+%.o: %.asm
+	$(AS) $(ASFLAGS) $< -o $@
+
+# Regola generica per compilare qualsiasi file C
+%.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Linking dell'eseguibile ELF del kernel
+# Linking del kernel
 $(KERNEL_BIN): $(OBJS)
 	$(LD) $(LDFLAGS) -o $@ $(OBJS)
 
-# Creazione dell'immagine ISO avviabile tramite GRUB
+# Creazione dell'immagine ISO con GRUB
 $(ISO_OUT): $(KERNEL_BIN)
 	grub-mkrescue -o $(ISO_OUT) iso
 
-# Avvio rapido su QEMU
+# Avvio su QEMU
 run: $(ISO_OUT)
 	qemu-system-i386 -cdrom $(ISO_OUT)
 

@@ -11,5 +11,7 @@ void kernel_main()
 
     line = vga_put_chars("[KERNEL] - Kernel loaded succesfully", green_fbg, line);
 
+    // Forth VM starts here
+
     while (1) {}
 }
