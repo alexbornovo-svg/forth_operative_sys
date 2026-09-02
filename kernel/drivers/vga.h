@@ -15,6 +15,9 @@
 uint8_t vga_entry_color(uint8_t fg, uint8_t bg);
 uint16_t vga_entry(unsigned char uc, uint8_t color);
 
+void vga_clean_screen();
+void vga_scroll();
+
 void vga_put_char(char c, uint8_t color, int x, int y);
 int vga_put_chars(char* c, uint8_t color, int line);
 

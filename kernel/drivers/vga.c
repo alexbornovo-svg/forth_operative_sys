@@ -20,6 +20,17 @@ void vga_put_char(char c, uint8_t color, int x, int y)
     vga_buffer[index] = vga_entry(c, color);
 }
 
+void vga_clean_screen()
+{
+    for (int row; row < VGA_HEIGHT; row++)
+    {
+        for (int column; column < VGA_WIDTH; column++)
+        {
+            vga_put_char(' ', vga_entry_color(WHITE, BLACK), row, column);
+        }
+    }
+}
+
 int vga_put_chars(char* c, uint8_t color, int line) 
 {
     if (line < 0 || line >= VGA_HEIGHT) 
@@ -29,11 +40,36 @@ int vga_put_chars(char* c, uint8_t color, int line)
 
     int column = 0;
 
-    for (int i = 0; c[i] != '\0' && column < VGA_WIDTH; i++) 
+    for (int i = 0; c[i] != '\0'; i++) 
     {
         if (c[i] == '\n') 
         {
             line++;
+            column = 0;
+            if (line >= VGA_HEIGHT) 
+            {
+                vga_scroll();
+                line = VGA_HEIGHT - 1;
+            }
+            continue;
+        }
+        
+        if (c[i] == '\r')
+        {
+            column = 0;
+            continue;
+        }
+
+        // Gestione del wrap automatico a fine riga
+        if (column >= VGA_WIDTH) 
+        {
+            column = 0;
+            line++;
+            if (line >= VGA_HEIGHT) 
+            {
+                vga_scroll();
+                line = VGA_HEIGHT - 1;
+            }
         }
 
         vga_put_char(c[i], color, column, line);
@@ -41,6 +77,23 @@ int vga_put_chars(char* c, uint8_t color, int line)
     }
 
     return line + 1;
+}
+
+void vga_scroll() 
+{
+    for (int y = 0; y < VGA_HEIGHT - 1; y++) 
+    {
+        for (int x = 0; x < VGA_WIDTH; x++) 
+        {
+            vga_buffer[y * VGA_WIDTH + x] = vga_buffer[(y + 1) * VGA_WIDTH + x];
+        }
+    }
+
+    uint16_t blank = vga_entry(' ', vga_entry_color(WHITE, BLACK));
+    for (int x = 0; x < VGA_WIDTH; x++) 
+    {
+        vga_buffer[(VGA_HEIGHT - 1) * VGA_WIDTH + x] = blank;
+    }
 }
 
 
