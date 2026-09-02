@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 
-#define WIDTH 80
-#define HEIGHT 25
+#define VGA_WIDTH 80
+#define VGA_HEIGHT 25
 
 #define BLACK 0x0
 #define GREEN 0x2
@@ -17,5 +17,12 @@ uint16_t vga_entry(unsigned char uc, uint8_t color);
 
 void vga_put_char(char c, uint8_t color, int x, int y);
 int vga_put_chars(char* c, uint8_t color, int line);
+
+// Cursor
+
+void enable_cursor(uint8_t cursor_start, uint8_t cursor_end);
+void disable_cursor();
+uint16_t get_cursor_position();
+void update_cursor(int x, int y);
 
 #endif

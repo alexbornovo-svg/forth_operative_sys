@@ -5,7 +5,7 @@ LD = ld
 
 # Flag di compilazione
 ASFLAGS = -f elf32
-CFLAGS = -m32 -ffreestanding -O2 -Wall -Wextra -fno-pie
+CFLAGS = -m32 -ffreestanding -O2 -Wall -Wextra -fno-pie -Ikernel
 LDFLAGS = -m elf_i386 -T linker.ld -nostdlib
 
 # File sorgente e oggetti

@@ -1,4 +1,5 @@
 #include "vga.h"
+#include "../common_headers/io.h"
 
 volatile uint16_t* vga_buffer = (volatile uint16_t*) 0xB8000;
 
@@ -14,20 +15,21 @@ uint16_t vga_entry(unsigned char uc, uint8_t color)
 
 void vga_put_char(char c, uint8_t color, int x, int y) 
 {
-    int index = y * WIDTH + x;
+    int index = y * VGA_WIDTH + x;
+    update_cursor(x, y);
     vga_buffer[index] = vga_entry(c, color);
 }
 
 int vga_put_chars(char* c, uint8_t color, int line) 
 {
-    if (line < 0 || line >= HEIGHT) 
+    if (line < 0 || line >= VGA_HEIGHT) 
     {
         return -1;
     }
 
     int column = 0;
 
-    for (int i = 0; c[i] != '\0' && column < WIDTH; i++) 
+    for (int i = 0; c[i] != '\0' && column < VGA_WIDTH; i++) 
     {
         if (c[i] == '\n') 
         {
@@ -39,4 +41,42 @@ int vga_put_chars(char* c, uint8_t color, int line)
     }
 
     return line + 1;
+}
+
+
+// HARDWARE CURSOR UTILS - https://wiki.osdev.org/Text_Mode_Cursor
+
+void enable_cursor(uint8_t cursor_start, uint8_t cursor_end)
+{
+	outb(0x3D4, 0x0A);
+	outb(0x3D5, (inb(0x3D5) & 0xC0) | cursor_start);
+
+	outb(0x3D4, 0x0B);
+	outb(0x3D5, (inb(0x3D5) & 0xE0) | cursor_end);
+}
+
+void disable_cursor()
+{
+	outb(0x3D4, 0x0A);
+	outb(0x3D5, 0x20);
+}
+
+void update_cursor(int x, int y)
+{
+	uint16_t pos = y * VGA_WIDTH + x;
+
+	outb(0x3D4, 0x0F);
+	outb(0x3D5, (uint8_t) (pos & 0xFF));
+	outb(0x3D4, 0x0E);
+	outb(0x3D5, (uint8_t) ((pos >> 8) & 0xFF));
+}
+
+uint16_t get_cursor_position()
+{
+    uint16_t pos = 0;
+    outb(0x3D4, 0x0F);
+    pos |= inb(0x3D5);
+    outb(0x3D4, 0x0E);
+    pos |= ((uint16_t)inb(0x3D5)) << 8;
+    return pos;
 }
