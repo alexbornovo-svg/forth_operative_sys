@@ -10,6 +10,7 @@ Right now, the project has:
 
 * Basic output with VGA (driver: kernel/drivers/vga.c)
 * Basic common headers for I/O with ports (file: kernel/common_headers/io.h)
+* GDT and IDT (32 bit, with prep for a future 64 bit mode)
 
 ## What are the next steps?
 

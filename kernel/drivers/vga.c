@@ -22,11 +22,11 @@ void vga_put_char(char c, uint8_t color, int x, int y)
 
 void vga_clean_screen()
 {
-    for (int row; row < VGA_HEIGHT; row++)
+    for (int y = 0; y < VGA_HEIGHT; y++)
     {
-        for (int column; column < VGA_WIDTH; column++)
+        for (int x = 0; x < VGA_WIDTH; x++)
         {
-            vga_put_char(' ', vga_entry_color(WHITE, BLACK), row, column);
+            vga_put_char(' ', vga_entry_color(WHITE, BLACK), x, y);
         }
     }
 }
