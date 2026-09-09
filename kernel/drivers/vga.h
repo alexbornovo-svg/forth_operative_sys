@@ -8,8 +8,8 @@
 
 #define BLACK 0x0
 #define GREEN 0x2
-#define RED   0x4
-#define GREY  0x8
+#define RED 0x4
+#define GREY 0x8
 #define WHITE 0xF
 
 uint8_t vga_entry_color(uint8_t fg, uint8_t bg);

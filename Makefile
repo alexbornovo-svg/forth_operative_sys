@@ -22,7 +22,7 @@ OBJS = $(ASM_OBJ) $(C_OBJ)
 KERNEL_BIN = iso/boot/mykernel.bin
 ISO_OUT = forth_os.iso
 
-.PHONY: all clean run iso
+.PHONY: all clean run iso r 
 
 # Target predefinito: crea l'immagine ISO
 all: $(ISO_OUT)
@@ -49,8 +49,11 @@ $(ISO_OUT): $(KERNEL_BIN)
 
 # Avvio su QEMU
 run: $(ISO_OUT)
-	qemu-system-i386 -cdrom $(ISO_OUT)
+	qemu-system-i386 -cdrom $(ISO_OUT) -serial mon:stdio
 
 # Pulizia dei file generati
 clean:
 	rm -f $(OBJS) $(KERNEL_BIN) $(ISO_OUT)
+
+r:
+	make clean && make run && make clean

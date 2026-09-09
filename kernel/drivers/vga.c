@@ -1,6 +1,9 @@
 #include "vga.h"
 #include "../common_headers/io.h"
 
+#include <stddef.h>
+#include <stdint.h> 
+
 volatile uint16_t* vga_buffer = (volatile uint16_t*) 0xB8000;
 
 uint8_t vga_entry_color(uint8_t fg, uint8_t bg) 
@@ -20,13 +23,15 @@ void vga_put_char(char c, uint8_t color, int x, int y)
     vga_buffer[index] = vga_entry(c, color);
 }
 
-void vga_clean_screen()
+void vga_clean_screen(void)
 {
-    for (int y = 0; y < VGA_HEIGHT; y++)
+    const uint8_t color = vga_entry_color(WHITE, BLACK);
+    
+    for (size_t y = 0; y < VGA_HEIGHT; y++)
     {
-        for (int x = 0; x < VGA_WIDTH; x++)
+        for (size_t x = 0; x < VGA_WIDTH; x++)
         {
-            vga_put_char(' ', vga_entry_color(WHITE, BLACK), x, y);
+            vga_put_char(' ', color, x, y);
         }
     }
 }
