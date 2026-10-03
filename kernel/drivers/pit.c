@@ -12,6 +12,7 @@ static volatile uint32_t timer_ticks = 0;
 static uint32_t seconds = 0;
 static uint32_t minutes = 0;
 static uint32_t hours   = 0;
+static uint32_t pit_frequency = 100;
 
 static void draw_clock(void) 
 {
@@ -22,8 +23,9 @@ static void draw_clock(void)
     uint16_t color = 0x0F00;
 
     char clock_str[9];
-    clock_str[0] = '0' + (hours / 10);
-    clock_str[1] = '0' + ((hours + 2) % 10);
+    uint32_t local_hours = (hours + 2) % 24;
+    clock_str[0] = '0' + (local_hours / 10);
+    clock_str[1] = '0' + (local_hours % 10);
     clock_str[2] = ':';
     clock_str[3] = '0' + (minutes / 10);
     clock_str[4] = '0' + (minutes % 10);
@@ -69,6 +71,8 @@ void pit_init(uint32_t frequency)
 
     register_interrupt_handler(32, pit_callback);
 
+    pit_frequency = frequency;
+
     uint32_t divisor = PIT_BASE_FREQ / frequency;
     outb(PIT_COMMAND, 0x36);
     outb(PIT_CHANNEL_0, (uint8_t)(divisor & 0xFF));
@@ -79,4 +83,14 @@ void pit_init(uint32_t frequency)
 uint32_t pit_get_ticks(void) 
 {
     return timer_ticks;
+}
+
+void pit_sleep(uint32_t ms)
+{
+    uint32_t target = timer_ticks + (ms * pit_frequency + 999) / 1000;
+
+    while ((int32_t)(timer_ticks - target) < 0)
+    {
+        __asm__ volatile("hlt");
+    }
 }

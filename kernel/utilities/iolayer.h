@@ -1,14 +1,13 @@
-#ifndef IO_LAYER_H
-#define IO_LAYER_H
+#ifndef IOLAYER_H
+#define IOLAYER_H
 
-extern int line;
+#include <stdarg.h>
 
 void print_line(const char *msg);
-
-void input_get(const char *prompt, char *dest, int max_len);
-
 void print_fmt(const char *fmt, ...);
-
+int format_string(char *buf, int max_len, const char *fmt, va_list args);
+void input_get(const char *prompt, char *dest, int max_len);
 void set_line(int new_line_value);
+int get_line(void);
 
 #endif

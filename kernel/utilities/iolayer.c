@@ -1,17 +1,36 @@
 #include "drivers/vga.h"
 #include "drivers/ps2kbd.h"
-#include "common_headers/char_utils.h"
+#include "common_headers/types.h"
 #include "iolayer.h"
 #include <stdbool.h>
 #include <stdarg.h>
 
-int line = 0;
+#define TAG_BUF_SIZE 16
+#define FMT_BUF_SIZE 256
+
+typedef struct
+{
+    char *buf;
+    int idx;
+    int max_len;
+} fmt_out_t;
+
+static int line = 0;
 
 static uint8_t hex_char_to_val(char c)
 {
-    if (c >= '0' && c <= '9') return c - '0';
-    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    if (c >= '0' && c <= '9')
+    {
+        return c - '0';
+    }
+    if (c >= 'a' && c <= 'f')
+    {
+        return c - 'a' + 10;
+    }
+    if (c >= 'A' && c <= 'F')
+    {
+        return c - 'A' + 10;
+    }
     return 0;
 }
 
@@ -19,11 +38,11 @@ static uint8_t parse_color_tag(const char *buf, int len)
 {
     uint8_t bg = BLACK;
     uint8_t fg = WHITE;
-
     int comma_pos = -1;
+
     for (int i = 0; i < len; i++)
     {
-        if (char_cmp(buf[i], ',') == 0)
+        if (buf[i] == ',')
         {
             comma_pos = i;
             break;
@@ -50,18 +69,23 @@ static uint8_t parse_color_tag(const char *buf, int len)
     return vga_entry_color(fg, bg);
 }
 
+static void io_newline(int *column, int *current_line)
+{
+    *column = 0;
+    (*current_line)++;
+    if (*current_line >= VGA_HEIGHT)
+    {
+        vga_scroll();
+        *current_line = VGA_HEIGHT - 1;
+    }
+}
+
 static void io_advance(int *column, int *current_line)
 {
     (*column)++;
     if (*column >= VGA_WIDTH)
     {
-        *column = 0;
-        (*current_line)++;
-        if (*current_line >= VGA_HEIGHT)
-        {
-            vga_scroll();
-            *current_line = VGA_HEIGHT - 1;
-        }
+        io_newline(column, current_line);
     }
 }
 
@@ -69,16 +93,14 @@ void print_line(const char *msg)
 {
     uint8_t current_color = vga_entry_color(WHITE, BLACK);
     bool parsing_color_entry = false;
-
-    char tag_buf[16];
+    char tag_buf[TAG_BUF_SIZE];
     int tag_idx = 0;
-
     int column = 0;
     int current_line = line;
 
     for (int i = 0; msg[i] != '\0'; i++)
     {
-        if (!parsing_color_entry && char_cmp(msg[i], '{') == 0)
+        if (!parsing_color_entry && msg[i] == '{')
         {
             parsing_color_entry = true;
             tag_idx = 0;
@@ -87,13 +109,13 @@ void print_line(const char *msg)
 
         if (parsing_color_entry)
         {
-            if (char_cmp(msg[i], '}') == 0)
+            if (msg[i] == '}')
             {
                 tag_buf[tag_idx] = '\0';
                 current_color = parse_color_tag(tag_buf, tag_idx);
                 parsing_color_entry = false;
             }
-            else if (tag_idx < (int)sizeof(tag_buf) - 1)
+            else if (tag_idx < TAG_BUF_SIZE - 1)
             {
                 tag_buf[tag_idx++] = msg[i];
             }
@@ -102,13 +124,7 @@ void print_line(const char *msg)
 
         if (msg[i] == '\n')
         {
-            column = 0;
-            current_line++;
-            if (current_line >= VGA_HEIGHT)
-            {
-                vga_scroll();
-                current_line = VGA_HEIGHT - 1;
-            }
+            io_newline(&column, &current_line);
             continue;
         }
 
@@ -116,12 +132,8 @@ void print_line(const char *msg)
         io_advance(&column, &current_line);
     }
 
-    line = current_line + 1;
-    if (line >= VGA_HEIGHT)
-    {
-        vga_scroll();
-        line = VGA_HEIGHT - 1;
-    }
+    io_newline(&column, &current_line);
+    line = current_line;
 }
 
 void input_get(const char *prompt, char *dest, int max_len)
@@ -140,25 +152,29 @@ void input_get(const char *prompt, char *dest, int max_len)
     line = current_y;
 }
 
-static void fmt_putc(char *buf, int *idx, int max_len, char c)
+static void fmt_putc(fmt_out_t *out, char c)
 {
-    if (*idx < max_len - 1)
+    if (out->idx < out->max_len - 1)
     {
-        buf[*idx] = c;
-        (*idx)++;
+        out->buf[out->idx++] = c;
     }
 }
 
-static void fmt_puts(char *buf, int *idx, int max_len, const char *s)
+static void fmt_puts(fmt_out_t *out, const char *s)
 {
+    if (s == 0)
+    {
+        s = "(null)";
+    }
+
     while (*s != '\0')
     {
-        fmt_putc(buf, idx, max_len, *s);
+        fmt_putc(out, *s);
         s++;
     }
 }
 
-static void fmt_put_uint(char *buf, int *idx, int max_len, unsigned int value, int base, bool upper)
+static void fmt_put_uint(fmt_out_t *out, unsigned int value, unsigned int base, bool upper, int width, bool zero_pad)
 {
     char tmp[32];
     int tmp_len = 0;
@@ -170,59 +186,73 @@ static void fmt_put_uint(char *buf, int *idx, int max_len, unsigned int value, i
 
     while (value > 0)
     {
-        int digit = value % base;
-        char c;
+        unsigned int digit = value % base;
 
         if (digit < 10)
         {
-            c = '0' + digit;
+            tmp[tmp_len++] = (char)('0' + digit);
         }
         else
         {
-            c = (upper ? 'A' : 'a') + (digit - 10);
+            tmp[tmp_len++] = (char)((upper ? 'A' : 'a') + (digit - 10));
         }
 
-        tmp[tmp_len++] = c;
         value /= base;
+    }
+
+    for (int pad = tmp_len; pad < width; pad++)
+    {
+        fmt_putc(out, zero_pad ? '0' : ' ');
     }
 
     while (tmp_len > 0)
     {
         tmp_len--;
-        fmt_putc(buf, idx, max_len, tmp[tmp_len]);
+        fmt_putc(out, tmp[tmp_len]);
     }
 }
 
-static void fmt_put_int(char *buf, int *idx, int max_len, int value)
+static void fmt_put_int(fmt_out_t *out, int value, int width, bool zero_pad)
 {
     if (value < 0)
     {
-        fmt_putc(buf, idx, max_len, '-');
-        fmt_put_uint(buf, idx, max_len, (unsigned int)(-value), 10, false);
+        fmt_putc(out, '-');
+        fmt_put_uint(out, 0u - (unsigned int)value, 10, false, width > 0 ? width - 1 : 0, zero_pad);
     }
     else
     {
-        fmt_put_uint(buf, idx, max_len, (unsigned int)value, 10, false);
+        fmt_put_uint(out, (unsigned int)value, 10, false, width, zero_pad);
     }
 }
 
-void print_fmt(const char *fmt, ...)
+int format_string(char *buf, int max_len, const char *fmt, va_list args)
 {
-    char buf[256];
-    int idx = 0;
-
-    va_list args;
-    va_start(args, fmt);
+    fmt_out_t out = { buf, 0, max_len };
 
     for (int i = 0; fmt[i] != '\0'; i++)
     {
         if (fmt[i] != '%')
         {
-            fmt_putc(buf, &idx, (int)sizeof(buf), fmt[i]);
+            fmt_putc(&out, fmt[i]);
             continue;
         }
 
         i++;
+
+        bool zero_pad = false;
+        int width = 0;
+
+        if (fmt[i] == '0')
+        {
+            zero_pad = true;
+            i++;
+        }
+
+        while (fmt[i] >= '0' && fmt[i] <= '9')
+        {
+            width = width * 10 + (fmt[i] - '0');
+            i++;
+        }
 
         if (fmt[i] == '\0')
         {
@@ -233,65 +263,83 @@ void print_fmt(const char *fmt, ...)
         {
             case 'd':
             {
-                int value = va_arg(args, int);
-                fmt_put_int(buf, &idx, (int)sizeof(buf), value);
+                fmt_put_int(&out, va_arg(args, int), width, zero_pad);
                 break;
             }
             case 'u':
             {
-                unsigned int value = va_arg(args, unsigned int);
-                fmt_put_uint(buf, &idx, (int)sizeof(buf), value, 10, false);
+                fmt_put_uint(&out, va_arg(args, unsigned int), 10, false, width, zero_pad);
                 break;
             }
             case 'x':
             {
-                unsigned int value = va_arg(args, unsigned int);
-                fmt_put_uint(buf, &idx, (int)sizeof(buf), value, 16, false);
+                fmt_put_uint(&out, va_arg(args, unsigned int), 16, false, width, zero_pad);
                 break;
             }
             case 'X':
             {
-                unsigned int value = va_arg(args, unsigned int);
-                fmt_put_uint(buf, &idx, (int)sizeof(buf), value, 16, true);
+                fmt_put_uint(&out, va_arg(args, unsigned int), 16, true, width, zero_pad);
+                break;
+            }
+            case 'p':
+            {
+                fmt_puts(&out, "0x");
+                fmt_put_uint(&out, (unsigned int)va_arg(args, void *), 16, false, 8, true);
                 break;
             }
             case 's':
             {
-                const char *s = va_arg(args, const char *);
-                fmt_puts(buf, &idx, (int)sizeof(buf), s);
+                fmt_puts(&out, va_arg(args, const char *));
                 break;
             }
             case 'c':
             {
-                char c = (char)va_arg(args, int);
-                fmt_putc(buf, &idx, (int)sizeof(buf), c);
+                fmt_putc(&out, (char)va_arg(args, int));
                 break;
             }
             case '%':
             {
-                fmt_putc(buf, &idx, (int)sizeof(buf), '%');
+                fmt_putc(&out, '%');
                 break;
             }
             default:
             {
-                fmt_putc(buf, &idx, (int)sizeof(buf), '%');
-                fmt_putc(buf, &idx, (int)sizeof(buf), fmt[i]);
+                fmt_putc(&out, '%');
+                fmt_putc(&out, fmt[i]);
                 break;
             }
         }
     }
 
-    va_end(args);
+    if (max_len > 0)
+    {
+        buf[out.idx] = '\0';
+    }
 
-    buf[idx] = '\0';
+    return out.idx;
+}
+
+void print_fmt(const char *fmt, ...)
+{
+    char buf[FMT_BUF_SIZE];
+    va_list args;
+
+    va_start(args, fmt);
+    format_string(buf, FMT_BUF_SIZE, fmt, args);
+    va_end(args);
 
     print_line(buf);
 }
 
 void set_line(int new_line_value)
 {
-    if (new_line_value >= 0 && new_line_value < 25)
+    if (new_line_value >= 0 && new_line_value < VGA_HEIGHT)
     {
         line = new_line_value;
     }
+}
+
+int get_line(void)
+{
+    return line;
 }

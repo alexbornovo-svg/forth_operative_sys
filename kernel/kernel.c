@@ -1,15 +1,21 @@
 #include <stdint.h>
-#include "drivers/vga.h" 
+
 #include "arch/x86/gdt.h"
 #include "arch/x86/idt.h"
 #include "arch/x86/isr.h"
+#include "arch/x86/paging.h"
+
 #include "drivers/pic.h"
 #include "drivers/pit.h"
 #include "drivers/ps2kbd.h"
 #include "drivers/ata_pio.h"
-#include "utilities/iolayer.h"
+#include "drivers/vga.h" 
 #include "drivers/serial.h"
+#include "drivers/speaker.h"
+
+#include "utilities/iolayer.h"
 #include "common_headers/char_utils.h"
+#include "utilities/starter.h"
 
 void kernel_main()
 {
@@ -31,14 +37,19 @@ void kernel_main()
 
     __asm__ __volatile__("sti");
 
+    paging_init();
+    paging_enable();
+
+    vga_clean_screen();
+
+    starter_run();
+    
+
     // Best message ever
     print_line("{0,2}[KERNEL]{0,F} - Kernel loaded successfully");
-    line = 2;
 
     kbd_set_layout(&layout_it);
     enable_cursor(14, 15);
-
-    set_line(3);
 
     char command_buffer[128];
 

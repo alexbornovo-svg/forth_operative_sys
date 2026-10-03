@@ -3,6 +3,8 @@ AS = nasm
 CC = gcc
 LD = ld
 
+AUDIO = -audiodev pa,id=snd0 -machine pcspk-audiodev=snd0
+
 # Flag di compilazione
 ASFLAGS = -f elf32
 CFLAGS = -m32 -ffreestanding -O2 -Wall -Wextra -fno-pie -Ikernel
@@ -49,7 +51,7 @@ $(ISO_OUT): $(KERNEL_BIN)
 
 # Avvio su QEMU
 run: $(ISO_OUT)
-	qemu-system-i386 -cdrom $(ISO_OUT) -serial mon:stdio
+	qemu-system-i386 -cdrom $(ISO_OUT) -serial mon:stdio $(AUDIO)
 
 # Pulizia dei file generati
 clean:
