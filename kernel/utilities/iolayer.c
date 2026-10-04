@@ -3,6 +3,7 @@
 #include "common_headers/types.h"
 #include "iolayer.h"
 #include <stdbool.h>
+#include "common_headers/io.h"
 #include <stdarg.h>
 
 #define TAG_BUF_SIZE 16
@@ -16,6 +17,7 @@ typedef struct
 } fmt_out_t;
 
 static int line = 0;
+static int cursor_column = 0;
 
 static uint8_t hex_char_to_val(char c)
 {
@@ -89,6 +91,57 @@ static void io_advance(int *column, int *current_line)
     }
 }
 
+static void sync_cursor(int column, int row)
+{
+    uint16_t pos = (uint16_t)(row * VGA_WIDTH + column);
+
+    outb(0x3D4, 0x0F);
+    outb(0x3D5, (uint8_t)(pos & 0xFF));
+    outb(0x3D4, 0x0E);
+    outb(0x3D5, (uint8_t)((pos >> 8) & 0xFF));
+}
+
+void console_write(const char *buf, int len)
+{
+    uint8_t color = vga_entry_color(WHITE, BLACK);
+    int current_column = cursor_column;
+    int current_line = line;
+
+    for (int i = 0; i < len; i++)
+    {
+        char c = buf[i];
+
+        if (c == '\n')
+        {
+            io_newline(&current_column, &current_line);
+            continue;
+        }
+
+        if (c == '\r')
+        {
+            current_column = 0;
+            continue;
+        }
+
+        if (c == '\b')
+        {
+            if (current_column > 0)
+            {
+                current_column--;
+                vga_put_char(' ', color, current_column, current_line);
+            }
+            continue;
+        }
+
+        vga_put_char(c, color, current_column, current_line);
+        io_advance(&current_column, &current_line);
+    }
+
+    line = current_line;
+    cursor_column = current_column;
+    sync_cursor(current_column, current_line);
+}
+
 void print_line(const char *msg)
 {
     uint8_t current_color = vga_entry_color(WHITE, BLACK);
@@ -97,6 +150,11 @@ void print_line(const char *msg)
     int tag_idx = 0;
     int column = 0;
     int current_line = line;
+
+    if (cursor_column != 0)
+    {
+        io_newline(&column, &current_line);
+    }
 
     for (int i = 0; msg[i] != '\0'; i++)
     {
@@ -134,6 +192,7 @@ void print_line(const char *msg)
 
     io_newline(&column, &current_line);
     line = current_line;
+    cursor_column = 0;
 }
 
 void input_get(const char *prompt, char *dest, int max_len)
@@ -150,6 +209,7 @@ void input_get(const char *prompt, char *dest, int max_len)
     kbd_gets(dest, max_len, &current_x, &current_y);
 
     line = current_y;
+    cursor_column = 0;
 }
 
 static void fmt_putc(fmt_out_t *out, char c)

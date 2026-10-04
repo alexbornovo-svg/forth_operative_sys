@@ -4,6 +4,7 @@
 #include "arch/x86/idt.h"
 #include "arch/x86/isr.h"
 #include "arch/x86/paging.h"
+#include "arch/x86/syscall.h"
 
 #include "drivers/pic.h"
 #include "drivers/pit.h"
@@ -17,6 +18,22 @@
 #include "common_headers/char_utils.h"
 #include "utilities/starter.h"
 
+extern uint8_t user_hello_start[];
+extern uint8_t user_hello_end[];
+
+static void usermode_test(void)
+{
+    uint8_t *dest = (uint8_t *)USER_BASE;
+    uint32_t size = (uint32_t)(user_hello_end - user_hello_start);
+
+    for (uint32_t i = 0; i < size; i++)
+    {
+        dest[i] = user_hello_start[i];
+    }
+
+    enter_usermode(USER_BASE, USER_BASE + USER_REGION_SIZE - 16);
+}
+
 void kernel_main()
 {
     vga_clean_screen();
@@ -25,6 +42,7 @@ void kernel_main()
     gdt_init();
     idt_init();
     isr_init();
+    syscall_init();
 
     pic_remap();
 
@@ -62,6 +80,10 @@ void kernel_main()
         {
             vga_clean_screen();
             set_line(0);
+        }
+        else if (chars_cmp("usermode", command_buffer))
+        {
+            usermode_test();
         }
     }
 }

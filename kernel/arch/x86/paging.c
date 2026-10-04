@@ -38,12 +38,20 @@ void paging_init()
 
     for (i = 0; i < MAPPED_TABLES; i++)
     {
+        uint32_t flags = PAGE_PRESENT | PAGE_WRITE;
+
+        if (i == USER_TABLE)
+        {
+            flags |= PAGE_USER;
+        }
+
         for (j = 0; j < 1024; j++)
         {
             uint32_t phys = ((uint32_t)i * 1024 + (uint32_t)j) * PAGE_SIZE;
-            page_tables[i][j] = phys | PAGE_PRESENT | PAGE_WRITE;
+            page_tables[i][j] = phys | flags;
         }
-        page_directory[i] = ((uint32_t)page_tables[i]) | PAGE_PRESENT | PAGE_WRITE;
+
+        page_directory[i] = ((uint32_t)page_tables[i]) | flags;
     }
 
     register_interrupt_handler(14, page_fault_handler);

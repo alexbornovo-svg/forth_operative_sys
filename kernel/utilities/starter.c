@@ -190,7 +190,7 @@ static void type_text(const char *text, int y, uint8_t color)
 void starter_run(void)
 {
     const char *title = "FORTH OS";
-    const char *subtitle = "32-BIT PROTECTED MODE  -  FORTH INSIDE";
+    const char *subtitle = "FORTHIX UNDERDAHOOD KERNEL";
     int len = text_length(title);
     int width = char_x(title, len, 0) - GLYPH_GAP;
     int start_x = (VGA_WIDTH - width) / 2;

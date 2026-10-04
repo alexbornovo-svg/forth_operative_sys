@@ -1,11 +1,15 @@
 #include "gdt.h"
 
-#define GDT_ENTRIES 5
+#define GDT_ENTRIES 6
+#define TSS_STACK_SIZE 8192
 
 static struct gdt_descriptor_32 gdt[GDT_ENTRIES];
 static struct gdt_ptr_32 gdt_pointer;
+static struct tss_entry_32 tss;
+static uint8_t tss_stack[TSS_STACK_SIZE] __attribute__((aligned(16)));
 
 extern void gdt_flush(uint32_t gdt_ptr_addr);
+extern void tss_flush(void);
 
 void gdt_init(void) 
 {
@@ -23,7 +27,14 @@ void gdt_init(void)
     // Entry 4: User Data (0x20)
     encode_gdt_entry_32(&gdt[4], 0, 0xFFFFF, 0xF2, 0xC);
 
+    tss.ss0 = 0x10;
+    tss.esp0 = (uint32_t)tss_stack + TSS_STACK_SIZE;
+    tss.iomap_base = sizeof(tss);
+
+    encode_gdt_entry_32(&gdt[5], (uint32_t)&tss, sizeof(tss) - 1, 0x89, 0x0);
+
     gdt_flush((uint32_t)&gdt_pointer);
+    tss_flush();
 }
 
 void encode_gdt_entry_32(struct gdt_descriptor_32* entry, uint32_t base, uint32_t limit, uint8_t access, uint8_t flags) 
@@ -46,4 +57,9 @@ void encode_gdt_entry_64(struct gdt_descriptor_64* entry, uint64_t base, uint32_
     entry->base_high = (base >> 24) & 0xFF;
     entry->base_highest = (base >> 32) & 0xFFFFFFFF;
     entry->reserved = 0;
+}
+
+void tss_set_kernel_stack(uint32_t esp0)
+{
+    tss.esp0 = esp0;
 }

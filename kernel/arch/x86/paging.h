@@ -8,6 +8,10 @@
 #define PAGE_WRITE 0x2
 #define PAGE_USER 0x4
 
+#define USER_TABLE 2
+#define USER_BASE 0x00800000
+#define USER_REGION_SIZE 0x00400000
+
 extern uint32_t page_directory[1024] __attribute__((aligned(4096)));
 
 void paging_init();
