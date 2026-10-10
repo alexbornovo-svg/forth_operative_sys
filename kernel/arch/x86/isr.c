@@ -24,6 +24,8 @@ extern void irq9(void);  extern void irq10(void); extern void irq11(void);
 extern void irq12(void); extern void irq13(void); extern void irq14(void);
 extern void irq15(void); 
 
+extern void usermode_return(void);
+
 void isr_init(void) 
 {
     idt_set_gate(0,  (uint32_t)isr0,  0x08, 0x8E);
@@ -94,6 +96,11 @@ void isr_handler(registers_t* regs)
     else if (regs->int_no < 32)
     {
         print_fmt("{0,C}EXCEPTION %u{0,F} err=%u eip=%p", regs->int_no, regs->err_code, (void *)regs->eip);
+
+        if ((regs->cs & 3) == 3)
+        {
+            usermode_return();
+        }
 
         for (;;)
         {

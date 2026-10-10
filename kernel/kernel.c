@@ -5,6 +5,7 @@
 #include "arch/x86/isr.h"
 #include "arch/x86/paging.h"
 #include "arch/x86/syscall.h"
+#include "arch/x86/usermode.h"
 
 #include "drivers/pic.h"
 #include "drivers/pit.h"
@@ -20,31 +21,44 @@
 
 extern uint8_t user_hello_start[];
 extern uint8_t user_hello_end[];
+extern uint8_t user_forth_start[];
+extern uint8_t user_forth_end[];
 
-static void usermode_test(void)
+static void run_user_image(const uint8_t *start, const uint8_t *end)
 {
-    uint8_t *dest = (uint8_t *)USER_BASE;
-    uint32_t size = (uint32_t)(user_hello_end - user_hello_start);
+    uint32_t size = (uint32_t)(end - start);
 
-    for (uint32_t i = 0; i < size; i++)
+    if (size > USER_REGION_SIZE - 0x10000)
     {
-        dest[i] = user_hello_start[i];
+        print_line("{0,C}[KERNEL]{0,F} - user image too large");
+        return;
     }
+
+    void *zero_dest = (void *)USER_BASE;
+    uint32_t zero_count = USER_REGION_SIZE;
+    void *copy_dest = (void *)USER_BASE;
+    const uint8_t *copy_src = start;
+    uint32_t copy_count = size;
+
+    __asm__ volatile("cld; rep stosb" : "+D"(zero_dest), "+c"(zero_count) : "a"(0) : "memory");
+    __asm__ volatile("cld; rep movsb" : "+D"(copy_dest), "+S"(copy_src), "+c"(copy_count) : : "memory");
 
     enter_usermode(USER_BASE, USER_BASE + USER_REGION_SIZE - 16);
 }
 
-void kernel_main()
+void kernel_main(void)
 {
     vga_clean_screen();
 
-    // Init
     gdt_init();
     idt_init();
     isr_init();
     syscall_init();
 
     pic_remap();
+
+    paging_init();
+    paging_enable();
 
     ata_pio_init();
     kbd_init();
@@ -54,9 +68,6 @@ void kernel_main()
     serial_init_port(COM_1);
 
     __asm__ __volatile__("sti");
-
-    paging_init();
-    paging_enable();
 
     vga_clean_screen();
 
@@ -83,7 +94,11 @@ void kernel_main()
         }
         else if (chars_cmp("usermode", command_buffer))
         {
-            usermode_test();
+            run_user_image(user_hello_start, user_hello_end);
+        }
+        else if (chars_cmp("forth", command_buffer))
+        {
+            run_user_image(user_forth_start, user_forth_end);
         }
     }
 }

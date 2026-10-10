@@ -1,7 +1,10 @@
 #include "syscall.h"
 #include "isr.h"
 #include "paging.h"
+
 #include "utilities/iolayer.h"
+#include "drivers/vga.h"
+
 #include <stdbool.h>
 
 #define READ_MAX 256
@@ -85,6 +88,13 @@ static void syscall_handler(registers_t *regs)
             dst[n] = '\n';
             n++;
             regs->eax = n;
+            break;
+        }
+        case SYS_CLEAN:
+        {
+            vga_clean_screen();
+            set_line(0);
+            regs->eax = 0;
             break;
         }
         default:
